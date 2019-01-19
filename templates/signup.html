@@ -1,0 +1,42 @@
+{% extends "/templates/_base.html" %}
+{% block bodyContent %}
+
+<div class="container">
+  <div class="formDiv">
+    <h1 class="display-4">Signup</h1>
+    <form method="post">
+      <div class="form-group">
+        <input type="text" class="form-control" id="inputUsername" name="username" placeholder="Username">
+        <div class="invalid-feedback">
+          {{error_username}}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <input type="password" class="form-control" id="inputPassword" name="password" placeholder="Password">
+        <div class="invalid-feedback">
+          {{error_password}}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <input type="password" class="form-control" id="verifyPassword" name="verify" placeholder="Verify Password">
+        <div class="invalid-feedback">
+          {{error_verify}}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <input type="email" class="form-control" id="inputEmail" name="verify" placeholder="Email (optional)">
+        <div class="invalid-feedback">
+          {{error_email}}
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary mb-2">Signup</button>
+      <a href="/blog/login"><button type="button" class="btn btn-outline-secondary mb-2">Login</button></a>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

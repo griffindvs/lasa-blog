@@ -1,0 +1,20 @@
+{% extends "/templates/_base.html" %}
+{% block bodyContent %}
+
+<div class="container">
+  <h1 class="display-4 blogHeader">Griffin's WebApps Blog</h1>
+  <div id="content">
+    <!-- Python code embedded in HTML for Jinja2 engine -->
+    {% for post in posts %}
+    <div class="post">
+      <div class="postHeading">
+        <div class="postTitle">{{post.subject}}</div>
+        <div class="postDate lead">{{post.created.date().strftime("%A %B %d, %Y")}} {{post.created.time().strftime("%X %z")}}</div>
+      </div>
+      <div class="postContent">{{post.content}}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "/templates/_base.html" %}
+{% block bodyContent %}
+
+<div class="container">
+  <div class="formDiv">
+    <h1 class="display-4">Login</h1>
+    <form method="post">
+      <div class="form-group">
+        <input type="text" class="form-control" id="inputUsername" name="username" placeholder="Username">
+      </div>
+
+      <div class="form-group">
+        <input type="password" class="form-control" id="inputPassword" name="password" placeholder="Password">
+      </div>
+
+      {% if login_error != "" %}
+        <div class="alert alert-danger" role="alert">{{login_error}}</div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary mb-2">Login</button>
+      <a href="/blog/signup"><button type="button" class="btn btn-outline-secondary mb-2">Signup</button></a>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
