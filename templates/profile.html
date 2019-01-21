@@ -1,0 +1,19 @@
+{% extends "/templates/_base.html" %}
+{% block bodyContent %}
+
+<div class="container">
+  <h1 class="display-4">Welcome, {{username}}</h1>
+  <h4 class="lead">Add a new post <a href="newpost">here</a></h4>
+  {% for post in posts %}
+  <div class="post">
+    <div class="postHeading">
+      <div class="postTitle">{{post.subject}}</div>
+      <div class="postOwner">{{post.owner}}</div>
+      <div class="postDate lead">{{post.created.date().strftime("%A %B %d, %Y")}} {{post.created.time().strftime("%X %z")}}</div>
+    </div>
+    <div class="postContent">{{post.content}}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

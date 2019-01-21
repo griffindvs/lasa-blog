@@ -5,8 +5,8 @@ import jinja2
 import os
 import time
 import cgi
-import random
 import hashlib
+import binascii
 from google.appengine.ext import db
 
 JINJA_ENVIRONMENT = jinja2.Environment(
@@ -24,44 +24,39 @@ class MyHandler(webapp2.RequestHandler):
     def render(self, template, **kw):
         self.write(self.render_str(template, **kw))
 
-def hash_str(s):
-   hashed = hashlib.md5(str(s))
-   return hashed.hexdigest()
+secureKeyFile = open("securekey.txt","r")
+secureKey = secureKeyFile.read()
 
 def make_secure_val(s):
-   hashed = hash_str(s)
-   output = str(s) + "|" + str(hashed)
-   return output
+    hash = hashlib.pbkdf2_hmac('sha256', b's', b'secureKey', 100000) ## Uses 100000 rounds of a sha256 hash
+    hashHex = binascii.hexlify(hash) ## Converts binary hash to hex for storage
+    output = str(s) + "|" + str(hashHex)
+    return output
 
 def check_secure_val(h):
-   barLoc = h.find('|')
-   s = h[:barLoc]
-   if (make_secure_val(s) == h):
-      return s
-   else:
-      return None
+    barLoc = h.find('|')
+    s = h[:barLoc]
+    if (make_secure_val(s) == h):
+        return s
+    else:
+        return None
 
 def make_salt():
-    salt = ""
-    for i in range(25):
-        x = random.randint(33, 126)
-        while (x == 34 or x == 39 or x == 124):
-            x = random.randint(33, 126)
-        salt = salt + str(chr(x))
-    logging.info("SALT: " + salt)
+    salt = os.urandom(8) ## Returns a string of 8 random bytes suitable for cryptographic use
     return salt
 
-def make_pw_hash(name, pw, salt=None):
+def make_pw_hash(pw, salt=None):
     if salt is None:
         salt = make_salt()
-    hash = hash_str(str(name) + str(pw) + str(salt))
-    output = str(hash) + "|" + str(salt)
+    hash = hashlib.pbkdf2_hmac('sha256', b'pw', b'salt', 100000) ## Uses 100000 rounds of a sha256 hash
+    hashHex = binascii.hexlify(hash) ## Converts binary hash to hex for storage
+    output = str(hashHex) + "|" + str(salt)
     return output
 
 def valid_pw(name, pw, h):
     barLoc = h.find('|')
     salt = h[barLoc:]
-    return (make_pw_hash(name, pw, salt) == h)
+    return (make_pw_hash(pw, salt) == h)
 
 USER_RE = re.compile(r'^[\w\-]{3,20}$')
 def valid_username(username):
@@ -81,6 +76,7 @@ def escape_html(s):
 class PostDB(db.Model):
     subject = db.StringProperty()
     content = db.TextProperty()
+    owner = db.StringProperty()
     created = db.DateTimeProperty(auto_now_add=True)
 
 class Users(db.Model):
@@ -90,7 +86,7 @@ class Users(db.Model):
 
 class HomeRedirect(MyHandler):
     def get(self):
-        self.redirect('/blog/welcome')
+        self.redirect('/blog/profile')
 
 class Signup(MyHandler):
     def write_signup(self, username_error_msg="", password_error_msg="", verify_error_msg="", email_error_msg="", user_username="", user_email=""):
@@ -154,7 +150,7 @@ class Signup(MyHandler):
             userID = userInst.key().id()
             userIDSecure = make_secure_val(userID)
             self.response.headers.add_header('Set-Cookie', 'user_id=%s; Path=/' % userIDSecure)
-            self.redirect('/blog/welcome')
+            self.redirect('/blog/profile')
 
 class Login(MyHandler):
     def write_login(self, login_error_msg=""):
@@ -175,14 +171,13 @@ class Login(MyHandler):
 
         if (user is not None):
             ##User exists
-            logging.info("HERE1")
             hash = user.passwordHash
             if (valid_pw(username, password, hash) is not None):
                 ##Username and password are valid
                 userID = user.key().id()
                 userIDSecure = make_secure_val(userID)
                 self.response.headers.add_header('Set-Cookie', 'user_id=%s; Path=/' % userIDSecure)
-                self.redirect('/blog/welcome')
+                self.redirect('/blog/profile')
 
         login_error_msg = "Invalid login"
         self.write_login(login_error_msg)
@@ -192,14 +187,15 @@ class Logout(MyHandler):
         self.response.headers.add_header('Set-Cookie', 'user_id=; Path=/')
         self.redirect('/blog/login')
 
-class Welcome(MyHandler):
-    def write_welcome(self, username=""):
-        welcomeValues = {"username": username}
-        welcome = JINJA_ENVIRONMENT.get_template('templates/welcome.html')
-        self.response.write(welcome.render(welcomeValues))
+class Profile(MyHandler):
+    def write_profile(self, username=""):
+        posts = db.GqlQuery("SELECT * FROM PostDB WHERE owner = '%s' ORDER BY created DESC limit 10" % username)
+        profileValues = {"username": username}
+        profile = JINJA_ENVIRONMENT.get_template('templates/profile.html')
+        self.response.write(profile.render(profileValues, posts=posts))
 
     def get(self):
-        logging.info("********** Welcome GET **********")
+        logging.info("********** Profile GET **********")
         self.response.headers['Content-Type'] = 'text/html'
 
         userIDHashed = self.request.cookies.get('user_id', '0')
@@ -208,7 +204,7 @@ class Welcome(MyHandler):
             self.redirect('/blog/login')
         else:
             user = Users.get_by_id(int(userID))
-            self.write_welcome(user.username)
+            self.write_profile(user.username)
 
 class Blog(MyHandler):
     def renderPosts(self):
@@ -235,15 +231,21 @@ class NewPost(MyHandler):
         subject = self.request.get("subject")
         content = self.request.get("content")
 
-        logging.info("SUBJECT: " + str(subject) + " CONTENT: " + str(content))
-
         if ((not subject) or (not content)):
-            inputError = "Please provide both a subject and content"
+            inputError = "Please provide both a title and post content"
             self.renderNewPost(inputError)
         else:
+            userIDHashed = self.request.cookies.get('user_id', '0')
+            userID = check_secure_val(userIDHashed)
+            if (userID == None):
+                self.redirect('/blog/login')
+            else:
+                user = Users.get_by_id(int(userID))
+
             postInst = PostDB()
             postInst.subject = subject
             postInst.content = content
+            postInst.owner = user.username
             postInst.put()
             time.sleep(.2)
             postID = postInst.key().id()
@@ -266,7 +268,7 @@ application = webapp2.WSGIApplication([
     (r'/blog/signup/?', Signup),
     (r'/blog/login/?', Login),
     (r'/blog/logout/?', Logout),
-    (r'/blog/welcome/?', Welcome),
+    (r'/blog/profile/?', Profile),
     (r'/blog/?', Blog),
     ('/blog/newpost/?', NewPost),
     (r'/blog/(\d+)/?', PostHandler)

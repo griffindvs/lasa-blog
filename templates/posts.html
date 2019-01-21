@@ -9,6 +9,7 @@
     <div class="post">
       <div class="postHeading">
         <div class="postTitle">{{post.subject}}</div>
+        <div class="postOwner">{{post.owner}}</div>
         <div class="postDate lead">{{post.created.date().strftime("%A %B %d, %Y")}} {{post.created.time().strftime("%X %z")}}</div>
       </div>
       <div class="postContent">{{post.content}}</div>
